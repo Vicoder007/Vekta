@@ -341,26 +341,48 @@ if submit and query:
                     # Bouton de téléchargement
                     st.subheader("💾 Téléchargement")
                     
-                    if workout_data.get('zwo_file_path'):
+                    if workout_data.get('zwo_download_url'):
                         try:
-                            # Lecture du fichier .zwo généré
-                            import os
-                            zwo_path = workout_data['zwo_file_path']
-                            if os.path.exists(zwo_path):
-                                with open(zwo_path, 'r', encoding='utf-8') as f:
-                                    zwo_content = f.read()
+                            # Téléchargement via l'API
+                            download_url = f"{API_BASE_URL}{workout_data['zwo_download_url']}"
+                            
+                            # Récupération du contenu du fichier via l'API
+                            import requests
+                            response = requests.get(download_url, timeout=10)
+                            
+                            if response.status_code == 200:
+                                zwo_content = response.text
+                                filename = workout_data['zwo_download_url'].split('/')[-1]
                                 
                                 st.download_button(
-                                    label="📥 Download .zwo",
+                                    label="📥 Télécharger le fichier .zwo",
                                     data=zwo_content,
-                                    file_name=f"vekta_workout_{int(time.time())}.zwo",
+                                    file_name=filename,
                                     mime="application/xml",
-                                    help="Téléchargez le fichier .zwo pour Zwift"
+                                    help="Téléchargez le fichier .zwo pour l'importer dans Zwift",
+                                    use_container_width=True
                                 )
+                                
+                                st.success("✅ Fichier .zwo prêt pour Zwift !")
+                                
+                                # Prévisualisation du contenu (optionnel)
+                                with st.expander("👁️ Prévisualiser le fichier .zwo"):
+                                    st.code(zwo_content, language="xml")
+                                    
                             else:
-                                st.error("Fichier .zwo non trouvé")
+                                st.error(f"❌ Erreur lors de la récupération du fichier (Code: {response.status_code})")
+                                
+                        except requests.exceptions.RequestException as e:
+                            st.error(f"❌ Erreur de connexion: {e}")
                         except Exception as e:
-                            st.error(f"Erreur lors du téléchargement: {e}")
+                            st.error(f"❌ Erreur lors du téléchargement: {e}")
+                    
+                    elif workout_data.get('zwo_file_path'):
+                        st.warning("⚠️ Fichier .zwo généré mais non accessible pour téléchargement")
+                        st.info("💡 Le fichier est disponible sur le serveur mais ne peut pas être téléchargé directement")
+                    
+                    else:
+                        st.info("ℹ️ Aucun fichier .zwo généré pour cette séance")
                     
                     # Détails techniques
                     with st.expander("🔧 Détails Techniques"):
