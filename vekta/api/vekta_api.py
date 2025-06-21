@@ -111,7 +111,8 @@ class ValidationResponse(BaseModel):
 class WorkoutGenerationRequest(BaseModel):
     query: str = Field(..., description="Requête utilisateur")
     generate_zwo: bool = Field(True, description="Générer le fichier .zwo")
-    ftp: Optional[int] = Field(None, description="FTP utilisateur en watts")
+    critical_power: Optional[int] = Field(250, description="Puissance critique en watts")
+    author: Optional[str] = Field("Vekta AI", description="Auteur de la séance")
     user_id: Optional[str] = Field(None, description="ID utilisateur")
 
 class WorkoutGenerationResponse(BaseModel):
@@ -147,49 +148,15 @@ async def lifespan(app: FastAPI):
         # Pour l'instant, on simule avec des objets mock
         logger.info("📦 Chargement des composants RAG...")
         
-        # TODO: Remplacer par les vrais imports quand les modules seront extraits
-        # from vekta.spell_checker import SpellChecker
-        # from vekta.corpus import EnhancedCorpus
-        # from vekta.rag_pipeline import RAGPipeline
-        # from vekta.zwo_generator import ZwoGenerator
+        # Import des vrais composants RAG
+        import sys
+        import os
         
-        # spell_checker = SpellChecker()
-        # corpus = EnhancedCorpus()
-        # rag_pipeline = RAGPipeline(spell_checker, corpus, embedding_system)
-        # zwo_generator = ZwoGenerator()
+        # Import des composants depuis le package components
+        from components.vekta_components import RAGPipeline, ZwoGenerator
         
-        # Mock pour le développement
-        class MockRAGPipeline:
-            def validate_query(self, query: str):
-                return {
-                    'success': True,
-                    'confidence': 0.85,
-                    'message': 'Séance trouvée avec haute confiance: Mock Workout',
-                    'workout': {
-                        'text': 'Mock workout text',
-                        'metadata': {
-                            'name': 'Mock Workout',
-                            'description': 'Mock workout description',
-                            'duration_minutes': 45,
-                            'difficulty': 3
-                        },
-                        'hybrid_score': 0.85
-                    },
-                    'correction_applied': False,
-                    'corrections': []
-                }
-        
-        class MockZwoGenerator:
-            def create_zwo_file(self, workout_text, metadata, output_dir="./generated_workouts"):
-                os.makedirs(output_dir, exist_ok=True)
-                filename = f"mock_workout_{int(time.time())}.zwo"
-                filepath = os.path.join(output_dir, filename)
-                with open(filepath, 'w') as f:
-                    f.write(f'<?xml version="1.0"?><workout><name>{metadata["name"]}</name></workout>')
-                return filepath
-        
-        rag_pipeline = MockRAGPipeline()
-        zwo_generator = MockZwoGenerator()
+        rag_pipeline = RAGPipeline()
+        zwo_generator = ZwoGenerator()
         
         logger.info("✅ Composants RAG chargés avec succès")
         
@@ -345,6 +312,33 @@ async def generate_workout(request: WorkoutGenerationRequest):
             )
         
         workout = validation_result['workout']
+        
+        # Enrichissement avec les données utilisateur
+        workout_metadata = workout['metadata'].copy()
+        workout_metadata['author'] = request.author
+        workout_metadata['critical_power'] = request.critical_power
+        workout_metadata['generated_at'] = datetime.now().isoformat()
+        
+        # Génération de données supplémentaires pour l'interface
+        duration_minutes = workout_metadata['duration_minutes']
+        avg_power_percent = 75 + (workout_metadata['difficulty'] * 5)  # 80-95% selon difficulté
+        training_stimulus = duration_minutes * (avg_power_percent / 100) * 1.2
+        estimated_calories = duration_minutes * 12 * (avg_power_percent / 100)
+        
+        # Génération d'étapes structurées pour l'interface
+        steps = _generate_workout_steps(workout['text'], workout_metadata)
+        
+        # Construction de la réponse enrichie
+        enriched_workout = {
+            **workout,
+            'metadata': workout_metadata,
+            'duration_minutes': duration_minutes,
+            'avg_power_percent': avg_power_percent,
+            'training_stimulus': training_stimulus,
+            'estimated_calories': estimated_calories,
+            'steps': steps
+        }
+        
         zwo_file_path = None
         zwo_download_url = None
         
@@ -353,7 +347,7 @@ async def generate_workout(request: WorkoutGenerationRequest):
             try:
                 zwo_file_path = zwo_generator.create_zwo_file(
                     workout['text'], 
-                    workout['metadata']
+                    workout_metadata
                 )
                 zwo_download_url = f"/download-zwo/{os.path.basename(zwo_file_path)}"
                 logger.info(f"Fichier .zwo généré: {zwo_file_path}")
@@ -367,7 +361,7 @@ async def generate_workout(request: WorkoutGenerationRequest):
         return WorkoutGenerationResponse(
             success=True,
             confidence=validation_result['confidence'],
-            workout=workout,
+            workout=enriched_workout,
             zwo_file_path=zwo_file_path,
             zwo_download_url=zwo_download_url,
             processing_time=processing_time
@@ -418,6 +412,92 @@ async def batch_validate(queries: List[str]):
             })
     
     return {"results": results}
+
+def _generate_workout_steps(workout_text: str, metadata: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """Génère les étapes structurées d'une séance pour l'interface"""
+    steps = []
+    difficulty = metadata.get('difficulty', 3)
+    zone = metadata.get('zone', 'Zone 3')
+    
+    # Analyse basique du texte pour extraire la structure
+    text_lower = workout_text.lower()
+    
+    # Échauffement
+    if 'echauffement' in text_lower or 'warm' in text_lower:
+        warmup_duration = 10  # défaut
+        if '15min' in text_lower and 'echauffement' in text_lower:
+            warmup_duration = 15
+        elif '20min' in text_lower and 'echauffement' in text_lower:
+            warmup_duration = 20
+        
+        steps.append({
+            'duration': warmup_duration,
+            'power_percent': 60,
+            'zone': 'Zone 2',
+            'description': 'Échauffement progressif'
+        })
+    
+    # Travail principal
+    main_duration = max(10, metadata['duration_minutes'] - 20)  # Total - échauffement - retour calme
+    main_power = 70 + (difficulty * 5)  # 75-95% selon difficulté
+    
+    if 'series' in text_lower or 'set' in text_lower:
+        # Séries avec récupération
+        if '3' in text_lower and '5min' in text_lower:
+            # 3x5min
+            for i in range(3):
+                steps.append({
+                    'duration': 5,
+                    'power_percent': main_power,
+                    'zone': zone,
+                    'description': f'Série {i+1} - Travail intensif'
+                })
+                if i < 2:  # Pas de récup après la dernière série
+                    steps.append({
+                        'duration': 2,
+                        'power_percent': 50,
+                        'zone': 'Zone 1',
+                        'description': 'Récupération'
+                    })
+        elif '5' in text_lower and '5min' in text_lower:
+            # 5x5min
+            for i in range(5):
+                steps.append({
+                    'duration': 5,
+                    'power_percent': main_power,
+                    'zone': zone,
+                    'description': f'Série {i+1} - Travail intensif'
+                })
+                if i < 4:
+                    steps.append({
+                        'duration': 2,
+                        'power_percent': 50,
+                        'zone': 'Zone 1',
+                        'description': 'Récupération'
+                    })
+    else:
+        # Travail continu
+        steps.append({
+            'duration': main_duration,
+            'power_percent': main_power,
+            'zone': zone,
+            'description': 'Travail principal continu'
+        })
+    
+    # Retour au calme
+    if 'retour' in text_lower or 'cool' in text_lower or 'calme' in text_lower:
+        cooldown_duration = 10
+        if '15min' in text_lower and ('retour' in text_lower or 'cool' in text_lower):
+            cooldown_duration = 15
+        
+        steps.append({
+            'duration': cooldown_duration,
+            'power_percent': 50,
+            'zone': 'Zone 1',
+            'description': 'Retour au calme'
+        })
+    
+    return steps
 
 if __name__ == "__main__":
     # Configuration pour le développement

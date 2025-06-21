@@ -213,12 +213,12 @@ with tab1:
             
             author = st.text_input("Auteur", value="Vekta AI")
             
-            col_duration, col_threshold = st.columns(2)
-            with col_duration:
-                duration = st.number_input("Durée (min)", min_value=10, max_value=300, value=60)
-            
+            col_threshold, col_spacer = st.columns(2)
             with col_threshold:
                 threshold_override = st.checkbox("Override Threshold")
+            
+            with col_spacer:
+                st.info("💡 La durée est calculée automatiquement depuis votre description")
             
             submit = st.form_submit_button("🚀 Générer la Séance", use_container_width=True)
     
@@ -260,20 +260,22 @@ if submit and query:
         elif validation_data:
             # Affichage des résultats de validation
             confidence = validation_data.get('confidence', 0)
-            is_valid = validation_data.get('is_valid', False)
+            is_success = validation_data.get('success', False)
             
-            if is_valid:
+            if is_success:
                 st.success(f"✅ Requête validée avec {confidence:.1%} de confiance")
                 
-                # Génération de la séance
+                # Génération de la séance (durée calculée automatiquement)
                 workout_data, error = call_api("/generate-workout", {
                     "query": query,
                     "author": author,
-                    "duration_minutes": duration,
                     "critical_power": critical_power
                 }, "POST")
                 
                 if workout_data and not error:
+                    # Extraction des données du workout
+                    workout = workout_data.get('workout', {})
+                    
                     # Affichage des métriques
                     st.subheader("📊 Métriques de la Séance")
                     
@@ -283,7 +285,7 @@ if submit and query:
                         st.markdown(f"""
                         <div class="metric-card">
                             <h3>⏱️ Durée</h3>
-                            <h2>{workout_data.get('duration_minutes', 0)} min</h2>
+                            <h2>{workout.get('duration_minutes', 0)} min</h2>
                         </div>
                         """, unsafe_allow_html=True)
                     
@@ -291,7 +293,7 @@ if submit and query:
                         st.markdown(f"""
                         <div class="metric-card">
                             <h3>⚡ Puissance</h3>
-                            <h2>{workout_data.get('avg_power_percent', 0):.0f}% FTP</h2>
+                            <h2>{workout.get('avg_power_percent', 0):.0f}% FTP</h2>
                         </div>
                         """, unsafe_allow_html=True)
                     
@@ -299,7 +301,7 @@ if submit and query:
                         st.markdown(f"""
                         <div class="metric-card">
                             <h3>🎯 Training Stimulus</h3>
-                            <h2>{workout_data.get('training_stimulus', 0):.1f}</h2>
+                            <h2>{workout.get('training_stimulus', 0):.1f}</h2>
                         </div>
                         """, unsafe_allow_html=True)
                     
@@ -307,21 +309,21 @@ if submit and query:
                         st.markdown(f"""
                         <div class="metric-card">
                             <h3>🔥 Calories</h3>
-                            <h2>{workout_data.get('estimated_calories', 0):.0f} kcal</h2>
+                            <h2>{workout.get('estimated_calories', 0):.0f} kcal</h2>
                         </div>
                         """, unsafe_allow_html=True)
                     
                     # Graphique de puissance
                     st.subheader("📈 Profil de Puissance")
-                    chart = create_power_chart(workout_data)
+                    chart = create_power_chart(workout)
                     if chart:
                         st.plotly_chart(chart, use_container_width=True)
                     
                     # Structure de la séance
                     st.subheader("🏃‍♂️ Structure de la Séance")
                     
-                    if 'steps' in workout_data:
-                        for i, step in enumerate(workout_data['steps'], 1):
+                    if 'steps' in workout:
+                        for i, step in enumerate(workout['steps'], 1):
                             duration = step.get('duration', 0)
                             power = step.get('power_percent', 0)
                             zone = step.get('zone', 'Zone 2')
@@ -339,14 +341,26 @@ if submit and query:
                     # Bouton de téléchargement
                     st.subheader("💾 Téléchargement")
                     
-                    if 'zwo_content' in workout_data:
-                        st.download_button(
-                            label="📥 Download .zwo",
-                            data=workout_data['zwo_content'],
-                            file_name=f"vekta_workout_{int(time.time())}.zwo",
-                            mime="application/xml",
-                            help="Téléchargez le fichier .zwo pour Zwift"
-                        )
+                    if workout_data.get('zwo_file_path'):
+                        try:
+                            # Lecture du fichier .zwo généré
+                            import os
+                            zwo_path = workout_data['zwo_file_path']
+                            if os.path.exists(zwo_path):
+                                with open(zwo_path, 'r', encoding='utf-8') as f:
+                                    zwo_content = f.read()
+                                
+                                st.download_button(
+                                    label="📥 Download .zwo",
+                                    data=zwo_content,
+                                    file_name=f"vekta_workout_{int(time.time())}.zwo",
+                                    mime="application/xml",
+                                    help="Téléchargez le fichier .zwo pour Zwift"
+                                )
+                            else:
+                                st.error("Fichier .zwo non trouvé")
+                        except Exception as e:
+                            st.error(f"Erreur lors du téléchargement: {e}")
                     
                     # Détails techniques
                     with st.expander("🔧 Détails Techniques"):
