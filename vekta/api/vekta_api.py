@@ -115,12 +115,32 @@ class WorkoutGenerationRequest(BaseModel):
     author: Optional[str] = Field("Vekta AI", description="Auteur de la séance")
     user_id: Optional[str] = Field(None, description="ID utilisateur")
 
+class ParametricWorkoutRequest(BaseModel):
+    query: str = Field(..., description="Requête utilisateur")
+    ftp_watts: int = Field(250, description="FTP en watts")
+    coach_mode: bool = Field(True, description="Mode coach expert (génération paramétrique)")
+    generate_zwo: bool = Field(True, description="Générer le fichier .zwo")
+    use_advanced: bool = Field(True, description="Utiliser le générateur avancé")
+    user_id: Optional[str] = Field(None, description="ID utilisateur")
+
 class WorkoutGenerationResponse(BaseModel):
     success: bool = Field(..., description="Génération réussie")
     confidence: float = Field(..., description="Score de confiance")
     workout: Dict[str, Any] = Field(..., description="Détails de la séance")
     zwo_file_path: Optional[str] = Field(None, description="Chemin du fichier .zwo généré")
     zwo_download_url: Optional[str] = Field(None, description="URL de téléchargement du .zwo")
+    processing_time: float = Field(..., description="Temps de traitement")
+
+class ParametricWorkoutResponse(BaseModel):
+    success: bool = Field(..., description="Génération réussie")
+    confidence: float = Field(..., description="Score de confiance")
+    mode: str = Field(..., description="Mode de génération utilisé")
+    workout: Optional[Dict[str, Any]] = Field(None, description="Détails de la séance")
+    zwo_file_path: Optional[str] = Field(None, description="Chemin du fichier .zwo généré")
+    zwo_download_url: Optional[str] = Field(None, description="URL de téléchargement du .zwo")
+    features: Optional[Dict[str, bool]] = Field(None, description="Fonctionnalités utilisées")
+    correction_applied: bool = Field(False, description="Corrections orthographiques appliquées")
+    corrections: List[str] = Field(default_factory=list, description="Liste des corrections")
     processing_time: float = Field(..., description="Temps de traitement")
 
 class HealthResponse(BaseModel):
@@ -372,6 +392,115 @@ async def generate_workout(request: WorkoutGenerationRequest):
     except Exception as e:
         logger.error(f"Erreur lors de la génération: {e}")
         raise HTTPException(status_code=500, detail=f"Erreur de génération: {str(e)}")
+
+@app.post("/generate-parametric", response_model=ParametricWorkoutResponse)
+async def generate_parametric_workout(request: ParametricWorkoutRequest):
+    """Génère une séance paramétrique pour coachs experts"""
+    if not rag_pipeline:
+        raise HTTPException(status_code=503, detail="Service RAG non initialisé")
+    
+    start_time = time.time()
+    
+    try:
+        # Génération paramétrique via le pipeline hybride
+        result = rag_pipeline.hybrid_process(
+            query=request.query,
+            coach_mode=request.coach_mode,
+            ftp_watts=request.ftp_watts
+        )
+        
+        # Enregistrement des métriques
+        success = result.get('success', False)
+        processing_time = time.time() - start_time
+        metrics.record_request('/generate-parametric', processing_time, success)
+        
+        if not success:
+            raise HTTPException(status_code=400, detail=result.get('message', 'Génération échouée'))
+        
+        # Construction de l'URL de téléchargement
+        zwo_download_url = None
+        if result.get('zwo_file'):
+            filename = os.path.basename(result['zwo_file'])
+            zwo_download_url = f"/download-zwo/{filename}"
+        
+        return ParametricWorkoutResponse(
+            success=result['success'],
+            confidence=result['confidence'],
+            mode=result.get('mode', 'parametric'),
+            workout=result.get('workout'),
+            zwo_file_path=result.get('zwo_file'),
+            zwo_download_url=zwo_download_url,
+            features=result.get('features'),
+            correction_applied=result.get('correction_applied', False),
+            corrections=result.get('corrections', []),
+            processing_time=processing_time
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        processing_time = time.time() - start_time
+        metrics.record_request('/generate-parametric', processing_time, False)
+        logger.error(f"Erreur lors de la génération paramétrique: {e}")
+        raise HTTPException(status_code=500, detail=f"Erreur interne: {str(e)}")
+
+@app.post("/hybrid-process", response_model=ParametricWorkoutResponse)
+async def hybrid_process_workout(request: ParametricWorkoutRequest):
+    """Pipeline hybride : RAG ou génération paramétrique selon le mode"""
+    if not rag_pipeline:
+        raise HTTPException(status_code=503, detail="Service RAG non initialisé")
+    
+    start_time = time.time()
+    
+    try:
+        # Traitement hybride
+        if request.coach_mode:
+            # Mode coach : génération paramétrique
+            result = rag_pipeline.generate_parametric_workout(
+                query=request.query,
+                ftp_watts=request.ftp_watts,
+                use_advanced=request.use_advanced
+            )
+        else:
+            # Mode utilisateur : RAG classique
+            result = rag_pipeline.validate_query(request.query)
+            # Adapter le format de retour pour la cohérence
+            result['mode'] = 'rag_classic'
+            result['features'] = {
+                'rag_search': True,
+                'semantic_matching': True,
+                'corpus_based': True
+            }
+        
+        # Enregistrement des métriques
+        success = result.get('success', False)
+        processing_time = time.time() - start_time
+        metrics.record_request('/hybrid-process', processing_time, success)
+        
+        # Construction de l'URL de téléchargement
+        zwo_download_url = None
+        if result.get('zwo_file'):
+            filename = os.path.basename(result['zwo_file'])
+            zwo_download_url = f"/download-zwo/{filename}"
+        
+        return ParametricWorkoutResponse(
+            success=result['success'],
+            confidence=result['confidence'],
+            mode=result.get('mode', 'unknown'),
+            workout=result.get('workout'),
+            zwo_file_path=result.get('zwo_file'),
+            zwo_download_url=zwo_download_url,
+            features=result.get('features'),
+            correction_applied=result.get('correction_applied', False),
+            corrections=result.get('corrections', []),
+            processing_time=processing_time
+        )
+        
+    except Exception as e:
+        processing_time = time.time() - start_time
+        metrics.record_request('/hybrid-process', processing_time, False)
+        logger.error(f"Erreur lors du traitement hybride: {e}")
+        raise HTTPException(status_code=500, detail=f"Erreur interne: {str(e)}")
 
 @app.get("/download-zwo/{filename}")
 async def download_zwo(filename: str):

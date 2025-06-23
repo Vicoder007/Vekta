@@ -437,6 +437,5 @@ st.markdown("---")
 st.markdown("""
 <div style='text-align: center; color: #6b7280; padding: 1rem;'>
     <p>🚴 <strong>Vekta AI</strong> - Générateur de séances d'entraînement cycliste alimenté par l'IA</p>
-    <p>Développé avec ❤️ pour la communauté cycliste</p>
 </div>
 """, unsafe_allow_html=True) 
