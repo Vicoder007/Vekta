@@ -7,9 +7,20 @@ from datetime import datetime
 import time
 
 # Import du nouveau parser intelligent
+import os
 import sys
-sys.path.append('../components')
-from llm_parser import IntelligentWorkoutParser, WorkoutEntity
+# Ajouter le chemin du module components au PYTHONPATH
+current_dir = os.path.dirname(os.path.abspath(__file__))
+vekta_root = os.path.dirname(current_dir)
+components_path = os.path.join(vekta_root, 'components')
+if components_path not in sys.path:
+    sys.path.insert(0, components_path)
+
+try:
+    from llm_parser import IntelligentWorkoutParser, WorkoutEntity
+except ImportError as e:
+    st.error(f"❌ Erreur d'import: {e}")
+    st.stop()
 
 # Configuration
 st.set_page_config(
