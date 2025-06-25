@@ -130,6 +130,10 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # Interface principale
+
+# Définir critical_power par défaut pour éviter l'erreur
+critical_power = 250
+
 col1, col2 = st.columns([2, 1])
 
 with col1:
