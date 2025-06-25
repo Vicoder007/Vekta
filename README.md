@@ -1,28 +1,36 @@
-# 🚴 Vekta V2 - Intelligence Architecture
+# 🧠 Vekta V2 - Interface Simple
 
-**Post-Interview Branch** - Architecture intelligente avec LLM open source
+Générateur d'entraînements cyclistes intelligent avec LLM open source.
 
-## 🏗️ Architecture
-
-```
-Query → Extraction Entités Flexible → LLM Génération → Validation Stricte → RAG Correction
-```
-
-## 🧠 LLM Integration
-
-- **API**: Hugging Face Inference API
-- **Model**: Llama-3.1-8B-Instruct
-- **Usage**: Extraction d'entités + génération structure
-
-## 🚀 Quick Start
+## 🚀 Démarrage Rapide
 
 ```bash
-cd vekta
-python launch_vekta.py
+python launch_vekta_v2.py
 ```
 
-## 📊 Performance Target
+**Interface**: http://localhost:8502
 
-- **Coverage**: 90%+ des queries Vekta
-- **Precision**: Validation ultra-stricte
-- **Flexibility**: Ordre libre des entités
+## ✨ Fonctionnalités
+
+- **Ordre libre**: `"5 minutes tempo"` = `"tempo 5 minutes"`
+- **Structures complexes**: `"2x3x5 minutes tempo"`
+- **LLM intelligent**: Hugging Face Llama-3.1-8B (optionnel)
+- **Interface épurée**: focus sur l'essentiel
+
+## 🎯 Exemples
+
+```
+✅ "5 minutes tempo"
+✅ "2x3x5 minutes seuil"
+✅ "5x3min à 95%"
+✅ "aerobic 10min puis 4x5min threshold"
+```
+
+## 🔧 Configuration
+
+- **Token HF** (optionnel): https://huggingface.co/settings/tokens
+- **Sans token**: mode fallback regex automatique
+
+---
+
+🧠 **Vekta V2** - Intelligence Architecture

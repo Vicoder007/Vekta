@@ -48,7 +48,7 @@ def launch_streamlit_v2():
     print("🚀 Lancement de Vekta V2 Intelligence...")
     
     # Vérifier que le fichier existe
-    app_file = Path('frontend/vekta_app_intelligent.py')
+    app_file = Path('frontend/vekta_app_simple.py')
     if not app_file.exists():
         print(f"❌ Fichier non trouvé: {app_file}")
         sys.exit(1)
