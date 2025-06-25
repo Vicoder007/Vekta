@@ -95,25 +95,6 @@
 
 ---
 
-### 🎯 **Décision Finale : Architecture Hybride**
-
-**Matrice décision** basée sur critères Vekta :
-
-| Critère | Poids | Hybride | RAG | LLM Fine-tuné | Parsing Pur |
-|---------|-------|---------|-----|---------------|-------------|
-| **Performance <100ms** | 25% | ✅ 95 | ❌ 30 | ⚠️ 60 | ✅ 100 |
-| **Précision numérique** | 20% | ✅ 95 | ❌ 70 | ✅ 90 | ✅ 98 |
-| **Time-to-market** | 15% | ✅ 90 | ✅ 85 | ❌ 30 | ✅ 95 |
-| **Maintenance** | 15% | ✅ 85 | ❌ 60 | ❌ 40 | ⚠️ 70 |
-| **Couverture cas** | 15% | ✅ 80 | ✅ 90 | ✅ 95 | ❌ 60 |
-| **Coût infrastructure** | 10% | ✅ 95 | ❌ 50 | ❌ 20 | ✅ 100 |
-
-**Score final** : Hybride 87% | RAG 67% | LLM 58% | Parsing 84%
-
-**Conclusion** : Architecture hybride optimale pour contraintes Vekta (performance + précision + TTM)
-
----
-
 ## 🎯 Choix Stratégiques Architecturaux
 
 ### 🔧 **Décisions Technologiques Principales**
