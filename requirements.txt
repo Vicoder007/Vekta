@@ -1,0 +1,18 @@
+# === VEKTA V2 MAC M3 - DÉPENDANCES ESSENTIELLES ===
+
+# Interface utilisateur
+streamlit==1.46.0
+plotly==6.1.2
+
+# Data processing essentiel
+pandas==2.1.4
+numpy==1.26.4
+
+# Communication avec Ollama
+requests==2.31.0
+
+# System monitoring pour Mac M3
+psutil==5.9.6
+
+# Utilitaires légers
+python-dotenv==1.1.0 

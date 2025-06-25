@@ -1,89 +1,38 @@
+# === VEKTA V2 MAC M3 - GITIGNORE ESSENTIEL ===
+
 # Python
 __pycache__/
 *.py[cod]
-*$py.class
 *.so
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
 *.egg-info/
-.installed.cfg
-*.egg
-MANIFEST
+dist/
+build/
 
 # Virtual environments
 .env
 .venv
-env/
 venv/
-ENV/
-env.bak/
-venv.bak/
+env/
 
 # IDE
 .vscode/
 .idea/
 *.swp
-*.swo
-*~
 
-# OS
+# macOS
 .DS_Store
-.DS_Store?
 ._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
-Thumbs.db
 
 # Logs
 *.log
-logs/
-vekta_api.log
+
+# Streamlit
+.streamlit/secrets.toml
 
 # Generated files
 generated_workouts/
 *.zwo
 
-# Jupyter
-.ipynb_checkpoints
-
-# Streamlit
-.streamlit/secrets.toml
-
-# Docker
-.dockerignore
-
 # Temporary files
 *.tmp
-*.temp
-temp/
-tmp/
-
-# Database
-*.db
-*.sqlite3
-
-# Environment variables
-.env.local
-.env.development
-.env.production
-
-# Coverage reports
-htmlcov/
-.coverage
-.coverage.*
-coverage.xml
-*.cover
-.hypothesis/
-.pytest_cache/ 
+temp/ 
