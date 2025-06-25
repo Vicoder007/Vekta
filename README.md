@@ -1,4 +1,4 @@
-# 🚴 Vekta - AI-powered Session Generator
+# 🚴 Vekta - reproduction
 
 **Pipeline de génération de séances d'entraînement cycliste avec architecture hybride strict**
 
@@ -61,7 +61,7 @@ Vekta/
 7. **📋 Architecture Technique** - Documentation formatée complète
 8. **🚴 Génération Zwift** - Export .zwo avec métadonnées
 
-### 🚀 **Pipeline Production** (Application Complète)
+### 🚀 **Pipeline Complet Reproduction** 
 
 **Objectif** : Déploiement industriel avec monitoring
 
@@ -213,37 +213,6 @@ docker-compose up --build
 # → Prod: HTTP 400 + guidance structurée
 ```
 
-### 📈 **Métriques Performance**
-
-| Métrique | Pipeline Démo | Pipeline Prod | Objectif |
-|----------|---------------|---------------|----------|
-| **Latence parsing** | <1ms | <5ms | <100ms ✓ |
-| **Latence totale** | <1ms | <100ms | <100ms ✓ |
-| **Taux succès** | 80% (4/5) | 80%+ | >75% ✓ |
-| **Précision numérique** | 95% | 95% | >90% ✓ |
-| **Export Zwift** | 100% | 100% | 100% ✓ |
-
----
-
-## 🎯 Avantages Architecturaux
-
-### 🚫 **vs Estimation Automatique**
-- **Transparence** : Pas de calculs cachés physiologiques
-- **Contrôle** : Utilisateur spécifie durées manquantes
-- **Robustesse** : Pas d'erreurs d'estimation en cascade
-
-### ⚡ **vs RAG Classique**
-- **Performance** : 5x plus rapide (parsing prioritaire)
-- **Précision** : 95% vs 70% sur données numériques cyclisme
-- **Maintenance** : Patterns explicites vs dépendance corpus
-
-### 🔧 **Architecture Modulaire**
-- **Démo** : Classes autonomes pour compréhension
-- **Prod** : Modules séparés pour scalabilité
-- **Partagé** : Logic core identique, interfaces différentes
-
----
-
 ## 📚 Technologies Principales
 
 ### **Core Pipeline** (Commun)
@@ -281,7 +250,3 @@ docker-compose up --build
 ### ✅ **Validation Graduée**
 - **Démo** : Scoring explicite avec métriques
 - **Prod** : Endpoints spécialisés + monitoring
-
----
-
-*Architecture Vekta : démonstration pédagogique + implémentation production, pipeline hybride strict commun, export Zwift natif.* 
