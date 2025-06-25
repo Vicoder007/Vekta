@@ -143,6 +143,32 @@ class ParametricWorkoutResponse(BaseModel):
     corrections: List[str] = Field(default_factory=list, description="Liste des corrections")
     processing_time: float = Field(..., description="Temps de traitement")
 
+class ContextualWorkoutRequest(BaseModel):
+    query: str = Field(..., description="Requête utilisateur")
+    location: str = Field("Paris, France", description="Localisation pour données météo")
+    athlete_fatigue: int = Field(3, ge=1, le=10, description="Niveau de fatigue (1-10)")
+    sleep_hours: float = Field(7.5, ge=0, le=12, description="Heures de sommeil")
+    stress_level: int = Field(3, ge=1, le=10, description="Niveau de stress (1-10)")
+    indoor_outdoor: str = Field("flexible", description="Type d'entraînement: indoor/outdoor/flexible")
+    equipment: Optional[List[str]] = Field(None, description="Équipement disponible")
+    ftp_watts: int = Field(250, description="FTP en watts")
+    generate_zwo: bool = Field(True, description="Générer le fichier .zwo")
+    user_id: Optional[str] = Field(None, description="ID utilisateur")
+
+class ContextualWorkoutResponse(BaseModel):
+    success: bool = Field(..., description="Génération réussie")
+    confidence: float = Field(..., description="Score de confiance")
+    workout: Optional[Dict[str, Any]] = Field(None, description="Détails de la séance")
+    contextual_enrichment: Optional[Dict[str, Any]] = Field(None, description="Données d'enrichissement contextuel")
+    critical_adaptations: Optional[List[Dict[str, Any]]] = Field(None, description="Adaptations critiques appliquées")
+    weather_data: Optional[Dict[str, Any]] = Field(None, description="Données météorologiques")
+    recommendations: List[Dict[str, Any]] = Field(default_factory=list, description="Recommandations contextuelles")
+    zwo_file_path: Optional[str] = Field(None, description="Chemin du fichier .zwo généré")
+    zwo_download_url: Optional[str] = Field(None, description="URL de téléchargement du .zwo")
+    enrichment_available: bool = Field(False, description="Module d'enrichissement disponible")
+    total_processing_time: float = Field(..., description="Temps de traitement total")
+    processing_time: float = Field(..., description="Temps de traitement base")
+
 class HealthResponse(BaseModel):
     status: str = Field(..., description="Status du service")
     version: str = Field(..., description="Version de l'API")
@@ -516,6 +542,91 @@ async def download_zwo(filename: str):
         filename=filename,
         headers={"Content-Disposition": f"attachment; filename={filename}"}
     )
+
+@app.post("/contextual-workout", response_model=ContextualWorkoutResponse)
+async def generate_contextual_workout(request: ContextualWorkoutRequest):
+    """Génère une séance avec enrichissement contextuel intelligent"""
+    if not rag_pipeline:
+        raise HTTPException(status_code=503, detail="Pipeline RAG non initialisé")
+    
+    start_time = time.time()
+    
+    try:
+        # Appel du pipeline avec enrichissement contextuel
+        result = rag_pipeline.process_with_contextual_enrichment(
+            query=request.query,
+            location=request.location,
+            athlete_fatigue=request.athlete_fatigue,
+            sleep_hours=request.sleep_hours,
+            stress_level=request.stress_level,
+            indoor_outdoor=request.indoor_outdoor,
+            equipment=request.equipment or ['trainer'],
+            ftp_watts=request.ftp_watts
+        )
+        
+        processing_time = time.time() - start_time
+        success = result.get('success', False)
+        
+        # Génération du fichier .zwo si demandé et si la génération a réussi
+        zwo_file_path = None
+        zwo_download_url = None
+        
+        if request.generate_zwo and success and result.get('workout'):
+            try:
+                workout_data = result['workout']
+                if isinstance(workout_data, dict):
+                    # Métadonnées pour le .zwo
+                    metadata = {
+                        'name': workout_data.get('name', 'Séance Vekta Contextuelle'),
+                        'description': workout_data.get('description', request.query),
+                        'duration_minutes': workout_data.get('duration_minutes', 60),
+                        'author': 'Vekta AI Contextuel'
+                    }
+                    
+                    zwo_file_path = zwo_generator.create_zwo_file(
+                        workout_text=request.query,
+                        metadata=metadata,
+                        output_dir="./generated_workouts"
+                    )
+                    
+                    # URL de téléchargement
+                    filename = os.path.basename(zwo_file_path)
+                    zwo_download_url = f"/download-zwo/{filename}"
+                    
+            except Exception as e:
+                logger.warning(f"Erreur génération .zwo: {e}")
+        
+        # Extraction des données contextuelles pour la réponse
+        contextual_data = result.get('contextual_enrichment', {})
+        weather_data = None
+        recommendations = []
+        
+        if contextual_data and contextual_data.get('success'):
+            weather_data = contextual_data.get('weather_data')
+            recommendations = contextual_data.get('recommendations', [])
+        
+        metrics.record_request('contextual-workout', processing_time, success)
+        
+        return ContextualWorkoutResponse(
+            success=success,
+            confidence=result.get('confidence', 0.0),
+            workout=result.get('workout'),
+            contextual_enrichment=contextual_data,
+            critical_adaptations=result.get('critical_adaptations'),
+            weather_data=weather_data,
+            recommendations=recommendations,
+            zwo_file_path=zwo_file_path,
+            zwo_download_url=zwo_download_url,
+            enrichment_available=result.get('enrichment_available', False),
+            total_processing_time=result.get('total_processing_time', processing_time),
+            processing_time=result.get('processing_time', processing_time)
+        )
+        
+    except Exception as e:
+        processing_time = time.time() - start_time
+        metrics.record_request('contextual-workout', processing_time, False)
+        logger.error(f"Erreur dans generate_contextual_workout: {e}")
+        raise HTTPException(status_code=500, detail=f"Erreur interne: {str(e)}")
 
 # Endpoint pour les tests de charge
 @app.post("/batch-validate")

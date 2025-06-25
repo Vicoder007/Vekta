@@ -13,6 +13,15 @@ from datetime import datetime
 import logging
 import numpy as np
 
+# Import du module d'enrichissement contextuel
+try:
+    from .contextual_enrichment import ContextualEnrichmentPipeline
+    CONTEXTUAL_ENRICHMENT_AVAILABLE = True
+    print("✅ Enrichissement contextuel disponible")
+except ImportError as e:
+    CONTEXTUAL_ENRICHMENT_AVAILABLE = False
+    print(f"⚠️ Enrichissement contextuel non disponible: {e}")
+
 # RAG et embeddings - Import conditionnel sécurisé
 SENTENCE_TRANSFORMERS_AVAILABLE = False
 try:
@@ -803,6 +812,12 @@ class RAGPipeline:
         self.spell_checker = SpellChecker()
         self.corpus = EnhancedCorpus()                    # SECONDAIRE
         
+        # Enrichissement contextuel
+        if CONTEXTUAL_ENRICHMENT_AVAILABLE:
+            self.contextual_enrichment = ContextualEnrichmentPipeline()
+        else:
+            self.contextual_enrichment = None
+        
         # Seuils Vekta réels (basés sur tests observés)
         self.vekta_auto_threshold = 0.9    # Génération automatique (comme observé)
         self.vekta_coach_threshold = 0.6   # Seuil minimum mode coach
@@ -1254,6 +1269,83 @@ class RAGPipeline:
             # MODE UTILISATEUR - Pipeline hybride avec validation
             logger.info("👤 Mode utilisateur - Pipeline hybride avec validation")
             return self.validate_query(query)
+    
+    def process_with_contextual_enrichment(
+        self, 
+        query: str, 
+        location: str = "Paris, France",
+        athlete_fatigue: int = 3,
+        sleep_hours: float = 7.5,
+        stress_level: int = 3,
+        indoor_outdoor: str = "flexible",
+        equipment: List[str] = None,
+        ftp_watts: int = 250
+    ) -> Dict[str, Any]:
+        """
+        Pipeline complet avec enrichissement contextuel intelligent
+        Combine génération Vekta + recommandations contextuelles
+        """
+        start_time = time.time()
+        
+        try:
+            # 1. Génération du workout de base (pipeline Vekta standard)
+            base_result = self.hybrid_process(query, coach_mode=False, ftp_watts=ftp_watts)
+            
+            # 2. Enrichissement contextuel si disponible
+            contextual_data = None
+            if self.contextual_enrichment:
+                contextual_data = self.contextual_enrichment.enrich_workout_request(
+                    workout_query=query,
+                    location=location,
+                    athlete_fatigue=athlete_fatigue,
+                    sleep_hours=sleep_hours,
+                    stress_level=stress_level,
+                    indoor_outdoor=indoor_outdoor,
+                    equipment=equipment or ['trainer']
+                )
+            
+            # 3. Combinaison des résultats
+            enriched_result = {
+                **base_result,
+                'contextual_enrichment': contextual_data,
+                'enrichment_available': self.contextual_enrichment is not None,
+                'total_processing_time': time.time() - start_time
+            }
+            
+            # 4. Application des recommandations critiques automatiquement
+            if contextual_data and contextual_data.get('success', False):
+                critical_recommendations = [
+                    rec for rec in contextual_data['recommendations'] 
+                    if rec['priority'] == 'critical'
+                ]
+                
+                if critical_recommendations:
+                    enriched_result['critical_adaptations'] = []
+                    for rec in critical_recommendations:
+                        enriched_result['critical_adaptations'].append({
+                            'adaptation': rec['recommended'],
+                            'reason': rec['reason'],
+                            'confidence': rec['confidence']
+                        })
+                    
+                    # Mise à jour du message principal
+                    if base_result.get('success', False):
+                        original_message = base_result.get('message', '')
+                        adaptation_notes = '; '.join([rec['adaptation'] for rec in critical_recommendations])
+                        enriched_result['message'] = f"{original_message}\n🌡️ Adaptations critiques: {adaptation_notes}"
+            
+            return enriched_result
+            
+        except Exception as e:
+            logger.error(f"Erreur enrichissement contextuel: {e}")
+            # Retour au pipeline standard en cas d'erreur
+            base_result = self.hybrid_process(query, coach_mode=False, ftp_watts=ftp_watts)
+            base_result['contextual_enrichment'] = {
+                'success': False,
+                'error': str(e)
+            }
+            base_result['enrichment_available'] = False
+            return base_result
 
 # ================================
 # GÉNÉRATEUR ZWO
